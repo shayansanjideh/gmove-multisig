@@ -364,7 +364,7 @@ export function useCreateMultisig() {
       });
 
       const payload = {
-        function: `${MODULES.MULTISIG}::${MULTISIG_FUNCTIONS.CREATE_WITH_OWNERS}`,
+        function: `${MODULES.MULTISIG}::${MULTISIG_FUNCTIONS.CREATE_WITH_OWNERS}` as `${string}::${string}::${string}`,
         typeArguments: [],
         functionArguments: [
           owners,                    // array of owner addresses
@@ -494,7 +494,7 @@ export function useCreateProposal(multisigAddress: string) {
         console.log('Trying with hex payload:', payloadHex.substring(0, 100) + '...');
 
         const proposalPayload = {
-          function: '0x1::multisig_account::create_transaction',
+          function: '0x1::multisig_account::create_transaction' as `${string}::${string}::${string}`,
           typeArguments: [],
           functionArguments: [
             multisigAddress,
@@ -607,7 +607,7 @@ export function useApproveTransaction(multisigAddress: string) {
       }
 
       const payload = {
-        function: `${MODULES.MULTISIG}::${MULTISIG_FUNCTIONS.APPROVE}`,
+        function: `${MODULES.MULTISIG}::${MULTISIG_FUNCTIONS.APPROVE}` as `${string}::${string}::${string}`,
         typeArguments: [],
         functionArguments: [multisigAddress, transactionId.toString()],
       };
@@ -647,7 +647,7 @@ export function useRejectTransaction(multisigAddress: string) {
       console.log('Rejecting transaction:', transactionId);
 
       const payload = {
-        function: `${MODULES.MULTISIG}::${MULTISIG_FUNCTIONS.REJECT}`,
+        function: `${MODULES.MULTISIG}::${MULTISIG_FUNCTIONS.REJECT}` as `${string}::${string}::${string}`,
         typeArguments: [],
         functionArguments: [multisigAddress, transactionId.toString()],
       };

@@ -118,7 +118,7 @@ export function useCreateProposalFixed(multisigAddress: string) {
 
           // Create the proposal
           const proposeTxn = {
-            function: '0x1::multisig_account::create_transaction',
+            function: '0x1::multisig_account::create_transaction' as `${string}::${string}::${string}`,
             typeArguments: [],
             functionArguments: [
               multisigAddress,

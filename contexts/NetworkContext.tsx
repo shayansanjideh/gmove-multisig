@@ -10,7 +10,7 @@ interface NetworkContextType {
   network: NetworkType;
   setNetwork: (network: NetworkType) => void;
   aptosClient: Aptos;
-  networkConfig: typeof NETWORK_CONFIG['mainnet'];
+  networkConfig: typeof NETWORK_CONFIG[NetworkType];
 }
 
 const NetworkContext = createContext<NetworkContextType | null>(null);

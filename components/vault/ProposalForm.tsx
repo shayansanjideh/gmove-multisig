@@ -147,7 +147,7 @@ export function ProposalForm({ vaultAddress, vaultBalance = 0, onSuccess }: Prop
     try {
       // Create a transfer proposal with expanded address and selected coin type
       const payload = {
-        function: '0x1::coin::transfer',
+        function: '0x1::coin::transfer' as `${string}::${string}::${string}`,
         typeArguments: [coinType],
         functionArguments: [fullAddress, amountInSmallestUnit.toString()],
       };

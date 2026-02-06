@@ -131,7 +131,7 @@ export function ManageOwners({ vaultAddress, currentOwners, threshold, onSuccess
         : MULTISIG_FUNCTIONS.REMOVE_OWNER;
 
       const payload = {
-        function: `${MODULES.MULTISIG}::${functionName}`,
+        function: `${MODULES.MULTISIG}::${functionName}` as `${string}::${string}::${string}`,
         typeArguments: [],
         functionArguments: [fullAddress],
       };

@@ -13,8 +13,9 @@ export async function getMultisigAddressFromTransaction(txHash: string): Promise
     console.log('Transaction details for multisig extraction:', txDetails);
 
     // Look through events for the multisig account creation
-    if (txDetails.events && Array.isArray(txDetails.events)) {
-      for (const event of txDetails.events) {
+    const txAny = txDetails as any;
+    if (txAny.events && Array.isArray(txAny.events)) {
+      for (const event of txAny.events) {
         console.log('Checking event:', {
           type: event.type,
           data: event.data,
@@ -44,8 +45,8 @@ export async function getMultisigAddressFromTransaction(txHash: string): Promise
     }
 
     // Alternative: Look in the transaction changes
-    if (txDetails.changes && Array.isArray(txDetails.changes)) {
-      for (const change of txDetails.changes) {
+    if (txAny.changes && Array.isArray(txAny.changes)) {
+      for (const change of txAny.changes) {
         // Look for write_resource changes that create a MultisigAccount resource
         if (change.type === 'write_resource' &&
             change.data?.type?.includes('multisig_account::MultisigAccount')) {

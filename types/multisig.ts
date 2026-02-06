@@ -14,9 +14,9 @@ export interface MultisigAccountResource {
 export interface Vault {
   address: string;
   name: string;
-  threshold: number;
-  owners: string[];
-  balance: number; // In MOVE (lamports)
+  threshold?: number;
+  owners?: string[];
+  balance?: number; // In MOVE (lamports)
   tokens?: TokenBalance[];
 }
 
