@@ -7,7 +7,7 @@ channel = "stable-24_05"
 
 [deployment]
 deploymentTarget = "autoscale"
-build = ["sh", "-c", "npm install && npm run build"]
+build = ["sh", "-c", "NODE_OPTIONS='--max-old-space-size=512' npm install && NODE_OPTIONS='--max-old-space-size=512' npm run build"]
 run = ["sh", "-c", "npm run start"]
 
 [[ports]]
