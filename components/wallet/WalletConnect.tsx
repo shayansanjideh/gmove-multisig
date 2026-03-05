@@ -83,16 +83,16 @@ export function WalletConnect() {
         onClick={handleConnect}
         disabled={isConnecting}
         className={cn(
-          'flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all',
-          'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700',
-          'text-white shadow-lg hover:shadow-xl',
-          'disabled:opacity-50 disabled:cursor-not-allowed',
-          connected && 'from-green-600 to-green-700 hover:from-green-700 hover:to-green-800'
+          'flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all',
+          connected
+            ? 'bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700'
+            : 'bg-movement-400 hover:bg-movement-500 text-neutral-900 shadow-card hover:shadow-card-hover',
+          'disabled:opacity-50 disabled:cursor-not-allowed'
         )}
       >
         {isConnecting ? (
           <>
-            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
             <span>Connecting...</span>
           </>
         ) : connected && account ? (
@@ -111,11 +111,11 @@ export function WalletConnect() {
 
       {/* Dropdown Menu */}
       {showDropdown && connected && (
-        <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50">
+        <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-dropdown border border-neutral-200 py-2 z-50">
           {/* Full Address */}
-          <div className="px-4 py-2 border-b border-gray-100">
-            <p className="text-xs text-gray-500 mb-1">Connected Wallet</p>
-            <p className="text-sm font-mono text-gray-900 break-all">
+          <div className="px-4 py-2 border-b border-neutral-100">
+            <p className="text-xs text-neutral-500 mb-1">Connected Wallet</p>
+            <p className="text-sm font-mono text-neutral-800 break-all">
               {getAccountAddress()}
             </p>
           </div>
@@ -123,12 +123,12 @@ export function WalletConnect() {
           {/* Copy Address */}
           <button
             onClick={handleCopyAddress}
-            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50 transition-colors"
           >
             {copied ? (
               <>
-                <Check className="w-4 h-4 text-green-600" />
-                <span className="text-green-600">Copied!</span>
+                <Check className="w-4 h-4 text-emerald-600" />
+                <span className="text-emerald-600">Copied!</span>
               </>
             ) : (
               <>

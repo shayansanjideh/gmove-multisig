@@ -24,30 +24,21 @@ export const MULTISIG_FUNCTIONS = {
   UPDATE_THRESHOLD: 'update_signatures_required',
 } as const;
 
-// Coin module functions
-export const COIN_FUNCTIONS = {
-  TRANSFER: 'transfer',
-  BALANCE: 'balance',
-} as const;
-
-// FA module functions
-export const FA_FUNCTIONS = {
-  TRANSFER: 'transfer',
-  BALANCE: 'balance',
-  METADATA: 'metadata',
-} as const;
-
 // Network configurations
 export const NETWORK_CONFIG = {
   mainnet: {
     name: 'Movement Mainnet',
     chainId: 1,
     rpc: process.env.NEXT_PUBLIC_MAINNET_RPC || 'https://mainnet.movementnetwork.xyz/v1',
+    indexer: 'https://indexer.mainnet.movementnetwork.xyz/v1/graphql',
+    explorerNetwork: 'mainnet',
   },
   testnet: {
     name: 'Movement Testnet',
     chainId: 4,
     rpc: process.env.NEXT_PUBLIC_TESTNET_RPC || 'https://testnet.movementnetwork.xyz/v1',
+    indexer: 'https://indexer.testnet.movementnetwork.xyz/v1/graphql',
+    explorerNetwork: 'testnet',
   },
 } as const;
 

@@ -15,18 +15,12 @@ const getNetworkFromStorage = (): 'mainnet' | 'testnet' => {
 };
 
 // Create Aptos client for a given network
-export const createAptosClient = (network: 'mainnet' | 'testnet') => {
+const createAptosClient = (network: 'mainnet' | 'testnet') => {
   const config = new AptosConfig({
     network: Network.CUSTOM,
     fullnode: NETWORK_CONFIG[network].rpc,
   });
   return new Aptos(config);
-};
-
-// Export a function to get the current client
-export const getAptosClient = () => {
-  const network = getNetworkFromStorage();
-  return createAptosClient(network);
 };
 
 // For backwards compatibility - lazy initialized client
@@ -107,11 +101,3 @@ export const formatAddress = (address: string | any, length = 6): string => {
   return `${cleanAddress.slice(0, length + 2)}...${cleanAddress.slice(-length)}`;
 };
 
-// Helper to normalize address (add 0x prefix and lowercase)
-export const normalizeAddress = (address: string | any): string => {
-  if (!address) return '';
-  // Convert to string if needed
-  const addressStr = typeof address === 'string' ? address : String(address);
-  const cleanAddress = addressStr.startsWith?.('0x') ? addressStr.slice(2) : addressStr;
-  return `0x${cleanAddress.toLowerCase()}`;
-};

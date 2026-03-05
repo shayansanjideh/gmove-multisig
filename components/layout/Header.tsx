@@ -32,14 +32,11 @@ export function Header() {
   })();
 
   return (
-    <header className="bg-white border-b border-gray-200 shadow-sm">
+    <header className="bg-neutral-900 border-b border-neutral-800">
       <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-          <Shield className="w-8 h-8 text-blue-600" />
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">Movement Multisig</h1>
-            <p className="text-xs text-gray-600">Native Multisig Interface</p>
-          </div>
+          <Shield className="w-8 h-8 text-movement-400" />
+          <h1 className="text-xl font-bold text-white tracking-heading">Movement Multisig</h1>
         </Link>
 
         <div className="flex items-center gap-3">
@@ -55,8 +52,8 @@ export function Header() {
             href="/"
             className={`flex items-center gap-2 px-1 py-3 text-sm font-medium border-b-2 transition-colors ${
               pathname === '/'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
+                ? 'border-movement-400 text-movement-400'
+                : 'border-transparent text-neutral-400 hover:text-neutral-200'
             }`}
           >
             <Shield className="w-4 h-4" />
@@ -66,8 +63,8 @@ export function Header() {
             href="/create-multisig"
             className={`flex items-center gap-2 px-1 py-3 text-sm font-medium border-b-2 transition-colors ${
               pathname === '/create-multisig'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
+                ? 'border-movement-400 text-movement-400'
+                : 'border-transparent text-neutral-400 hover:text-neutral-200'
             }`}
           >
             <Plus className="w-4 h-4" />
@@ -77,8 +74,8 @@ export function Header() {
             href="/faq"
             className={`flex items-center gap-2 px-1 py-3 text-sm font-medium border-b-2 transition-colors ${
               pathname === '/faq'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
+                ? 'border-movement-400 text-movement-400'
+                : 'border-transparent text-neutral-400 hover:text-neutral-200'
             }`}
           >
             <HelpCircle className="w-4 h-4" />
@@ -89,7 +86,7 @@ export function Header() {
 
       {/* Network Mismatch Warning Banner */}
       {isNetworkMismatch && (
-        <div className="bg-red-500 text-white px-4 py-2">
+        <div className="bg-red-500/90 text-white px-4 py-2">
           <div className="max-w-7xl mx-auto flex items-center gap-3">
             <AlertTriangle className="w-5 h-5 flex-shrink-0" />
             <p className="text-sm">

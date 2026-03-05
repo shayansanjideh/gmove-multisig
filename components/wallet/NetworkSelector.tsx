@@ -6,8 +6,8 @@ import { useNetwork, NetworkType } from '@/contexts/NetworkContext';
 import { cn } from '@/lib/utils';
 
 const networks: { id: NetworkType; name: string; color: string }[] = [
-  { id: 'mainnet', name: 'Mainnet', color: 'bg-green-500' },
-  { id: 'testnet', name: 'Testnet', color: 'bg-yellow-500' },
+  { id: 'mainnet', name: 'Mainnet', color: 'bg-emerald-500' },
+  { id: 'testnet', name: 'Testnet', color: 'bg-movement-400' },
 ];
 
 export function NetworkSelector() {
@@ -42,8 +42,8 @@ export function NetworkSelector() {
         onClick={() => setShowDropdown(!showDropdown)}
         className={cn(
           'flex items-center gap-2 px-3 py-2 rounded-lg font-medium transition-all',
-          'bg-gray-100 hover:bg-gray-200 text-gray-700',
-          'border border-gray-200'
+          'bg-neutral-800 hover:bg-neutral-700 text-neutral-300',
+          'border border-neutral-700'
         )}
       >
         <div className={cn('w-2 h-2 rounded-full', currentNetwork.color)} />
@@ -53,9 +53,9 @@ export function NetworkSelector() {
 
       {/* Dropdown Menu */}
       {showDropdown && (
-        <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50">
-          <div className="px-3 py-2 border-b border-gray-100">
-            <p className="text-xs text-gray-500 font-medium">Select Network</p>
+        <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-dropdown border border-neutral-200 py-2 z-50">
+          <div className="px-3 py-2 border-b border-neutral-100">
+            <p className="text-xs text-neutral-500 font-medium">Select Network</p>
           </div>
 
           {networks.map((net) => (
@@ -64,7 +64,7 @@ export function NetworkSelector() {
               onClick={() => handleNetworkChange(net.id)}
               className={cn(
                 'w-full flex items-center justify-between px-3 py-2 text-sm transition-colors',
-                network === net.id ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'
+                network === net.id ? 'bg-movement-50 text-movement-800' : 'text-neutral-700 hover:bg-neutral-50'
               )}
             >
               <div className="flex items-center gap-2">
@@ -75,8 +75,8 @@ export function NetworkSelector() {
             </button>
           ))}
 
-          <div className="px-3 py-2 border-t border-gray-100 mt-1">
-            <p className="text-xs text-gray-400">
+          <div className="px-3 py-2 border-t border-neutral-100 mt-1">
+            <p className="text-xs text-neutral-400">
               Switching networks will reload the page
             </p>
           </div>

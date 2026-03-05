@@ -160,10 +160,10 @@ export function ManageOwners({ vaultAddress, currentOwners, threshold, onSuccess
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-lg p-6">
+    <div className="bg-white rounded-xl shadow-card border border-neutral-200 p-6">
       <div className="flex items-center gap-2 mb-6">
-        <Users className="w-5 h-5 text-blue-600" />
-        <h2 className="text-lg font-semibold text-gray-900">Manage Vault Owners</h2>
+        <Users className="w-5 h-5 text-movement-600" />
+        <h2 className="text-lg font-semibold text-neutral-800">Manage Vault Owners</h2>
       </div>
 
       {/* Network Mismatch Warning */}
@@ -185,24 +185,24 @@ export function ManageOwners({ vaultAddress, currentOwners, threshold, onSuccess
       )}
 
       {/* Current Owners */}
-      <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-        <h3 className="text-sm font-medium text-gray-700 mb-3">
+      <div className="mb-6 p-4 bg-neutral-50 rounded-lg">
+        <h3 className="text-sm font-medium text-neutral-700 mb-3">
           Current Owners ({currentOwners.length})
         </h3>
         <div className="space-y-2">
           {currentOwners.map((owner, i) => (
             <div
               key={owner}
-              className="flex items-center gap-2 text-sm font-mono text-gray-600"
+              className="flex items-center gap-2 text-sm font-mono text-neutral-600"
             >
-              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-xs text-white">
+              <div className="w-6 h-6 rounded-full bg-movement-400 flex items-center justify-center text-xs text-neutral-900">
                 {i + 1}
               </div>
               <span>{formatAddress(owner, 8)}</span>
             </div>
           ))}
         </div>
-        <p className="mt-3 text-xs text-gray-500">
+        <p className="mt-3 text-xs text-neutral-500">
           Threshold: {threshold} of {currentOwners.length} required to approve transactions
         </p>
       </div>
@@ -218,8 +218,8 @@ export function ManageOwners({ vaultAddress, currentOwners, threshold, onSuccess
           }}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
             activeAction === 'add'
-              ? 'bg-green-100 text-green-700'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              ? 'bg-emerald-100 text-emerald-700'
+              : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
           }`}
         >
           <UserPlus className="w-4 h-4" />
@@ -235,7 +235,7 @@ export function ManageOwners({ vaultAddress, currentOwners, threshold, onSuccess
           className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
             activeAction === 'remove'
               ? 'bg-red-100 text-red-700'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
           }`}
         >
           <UserMinus className="w-4 h-4" />
@@ -246,7 +246,7 @@ export function ManageOwners({ vaultAddress, currentOwners, threshold, onSuccess
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-neutral-700 mb-1">
             {activeAction === 'add' ? 'New Owner Address' : 'Owner Address to Remove'}
           </label>
           <input
@@ -254,17 +254,17 @@ export function ManageOwners({ vaultAddress, currentOwners, threshold, onSuccess
             value={address}
             onChange={(e) => handleAddressChange(e.target.value)}
             placeholder="0x..."
-            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm ${
-              error ? 'border-red-500' : 'border-gray-300'
+            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-movement-300 font-mono text-sm ${
+              error ? 'border-red-500' : 'border-neutral-200'
             }`}
           />
           {expandedAddress && address !== expandedAddress && !error && (
-            <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="mt-2 p-2 bg-movement-50 border border-movement-200 rounded-lg">
               <div className="flex items-start gap-2">
-                <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                <Info className="w-4 h-4 text-movement-600 mt-0.5 flex-shrink-0" />
                 <div className="text-xs">
-                  <p className="text-blue-800 font-medium">Expanded address:</p>
-                  <p className="text-blue-700 break-all font-mono mt-1">{expandedAddress}</p>
+                  <p className="text-movement-800 font-medium">Expanded address:</p>
+                  <p className="text-movement-700 break-all font-mono mt-1">{expandedAddress}</p>
                 </div>
               </div>
             </div>
@@ -297,7 +297,7 @@ export function ManageOwners({ vaultAddress, currentOwners, threshold, onSuccess
           disabled={createProposal.isPending || !address || !!error}
           className={`w-full px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${
             activeAction === 'add'
-              ? 'bg-green-600 text-white hover:bg-green-700'
+              ? 'bg-emerald-600 text-white hover:bg-emerald-700'
               : 'bg-red-600 text-white hover:bg-red-700'
           }`}
         >

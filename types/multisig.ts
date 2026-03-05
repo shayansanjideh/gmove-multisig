@@ -16,16 +16,7 @@ export interface Vault {
   name: string;
   threshold?: number;
   owners?: string[];
-  balance?: number; // In MOVE (lamports)
-  tokens?: TokenBalance[];
-}
-
-export interface TokenBalance {
-  metadata: string;
-  name: string;
-  symbol: string;
-  decimals: number;
-  balance: number;
+  balance?: number; // In MOVE units (human-readable, not octas)
 }
 
 // Transaction Proposal State
@@ -43,21 +34,3 @@ export interface Proposal {
   human_readable?: string; // Human-readable description
 }
 
-// Transaction builder types
-export interface StandardTransaction {
-  type: 'transfer';
-  recipient: string;
-  amount: string;
-  token: 'MOVE' | string; // MOVE or FA metadata address
-}
-
-export interface DeveloperTransaction {
-  type: 'custom';
-  target: string;
-  module: string;
-  function: string;
-  typeArgs: string[];
-  args: any[];
-}
-
-export type TransactionPayload = StandardTransaction | DeveloperTransaction;

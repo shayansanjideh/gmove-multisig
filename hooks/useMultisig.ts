@@ -6,7 +6,6 @@ import { aptosClient } from '@/lib/aptos';
 import { storage } from '@/lib/utils';
 import { STORAGE_KEYS, MODULES, MULTISIG_FUNCTIONS } from '@/constants/modules';
 import { getMultisigAddressFromTransaction } from '@/lib/getMultisigAddress';
-import { generateMultisigPayload } from '@/lib/multisig-helpers';
 import type { MultisigAccountResource, Vault, Proposal } from '@/types/multisig';
 import {
   AccountAddress,
@@ -14,6 +13,28 @@ import {
   TransactionPayloadMultiSig,
   buildTransaction,
 } from '@aptos-labs/ts-sdk';
+import { getCurrentNetwork, expandAddress, isValidAddress } from '@/lib/aptos';
+
+// Network-aware storage key: vaults are per-network to avoid cross-network resource_not_found errors
+function getVaultsKey(): string {
+  const network = getCurrentNetwork();
+  return `${STORAGE_KEYS.WATCHED_VAULTS}_${network.explorerNetwork}`;
+}
+
+// One-time migration: move vaults from old shared key to current network key
+function migrateVaultsStorage(): void {
+  if (typeof window === 'undefined') return;
+  const oldKey = STORAGE_KEYS.WATCHED_VAULTS;
+  const oldData = storage.get<Vault[]>(oldKey);
+  if (oldData && oldData.length > 0) {
+    const newKey = getVaultsKey();
+    const existing = storage.get<Vault[]>(newKey);
+    if (!existing || existing.length === 0) {
+      storage.set(newKey, oldData);
+    }
+    storage.remove(oldKey);
+  }
+}
 
 // Interface for coin data
 export interface CoinData {
@@ -23,83 +44,109 @@ export interface CoinData {
   decimals: number;
   balance: string;
   balanceFormatted: string;
+  isFungibleAsset?: boolean;
+  faMetadata?: string;
+  verified?: boolean;
 }
 
-// Fetch all coins held by an account
+// Fetch all token balances via indexer (handles both legacy Coin and Fungible Assets)
 export function useAccountCoins(address: string) {
   return useQuery({
     queryKey: ['account-coins', address],
     queryFn: async () => {
       if (!address) return [];
 
-      try {
-        // Fetch all coin resources for the account
-        const resources = await aptosClient.getAccountResources({
-          accountAddress: address,
-        });
-
-        const coins: CoinData[] = [];
-
-        // Look for CoinStore resources
-        for (const resource of resources) {
-          if (resource.type.startsWith('0x1::coin::CoinStore<')) {
-            // Extract coin type from resource type
-            const match = resource.type.match(/0x1::coin::CoinStore<(.+)>/);
-            if (match) {
-              const coinType = match[1];
-              const coinData = resource.data as { coin: { value: string } };
-              const balance = coinData.coin?.value || '0';
-
-              // Determine coin name and symbol from type
-              let name = 'Unknown';
-              let symbol = 'UNK';
-              let decimals = 8;
-
-              if (coinType === '0x1::aptos_coin::AptosCoin') {
-                name = 'Movement';
-                symbol = 'MOVE';
-                decimals = 8;
-              } else {
-                // Try to extract name from coin type
-                const parts = coinType.split('::');
-                if (parts.length >= 3) {
-                  symbol = parts[parts.length - 1];
-                  name = symbol;
-                }
-              }
-
-              // Format the balance
-              const balanceNum = BigInt(balance);
-              const divisor = BigInt(10 ** decimals);
-              const whole = balanceNum / divisor;
-              const fractional = balanceNum % divisor;
-              const balanceFormatted = `${whole}.${fractional.toString().padStart(decimals, '0').slice(0, 4)}`;
-
-              // Only add if balance > 0
-              if (balanceNum > 0n) {
-                coins.push({
-                  coinType,
-                  name,
-                  symbol,
-                  decimals,
-                  balance,
-                  balanceFormatted,
-                });
-              }
+      const network = getCurrentNetwork();
+      const query = `
+        query GetAccountBalances($address: String!) {
+          current_fungible_asset_balances(
+            where: { owner_address: { _eq: $address }, amount: { _gt: "0" } }
+          ) {
+            amount
+            asset_type
+            metadata {
+              asset_type
+              name
+              symbol
+              decimals
+              token_standard
             }
           }
         }
+      `;
 
-        // Sort with MOVE first, then by balance
-        coins.sort((a, b) => {
+      try {
+        const resp = await fetch(network.indexer, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query, variables: { address } }),
+        });
+
+        if (!resp.ok) throw new Error(`Indexer returned ${resp.status}`);
+        const json = await resp.json();
+        const balances = json?.data?.current_fungible_asset_balances || [];
+
+        const coins: CoinData[] = [];
+        for (const bal of balances) {
+          const meta = bal.metadata;
+          if (!meta) continue;
+
+          const amount = bal.amount?.toString() || '0';
+          const decimals = meta.decimals ?? 8;
+          const balanceNum = BigInt(amount);
+          if (balanceNum <= 0n) continue;
+
+          const divisor = BigInt(10 ** decimals);
+          const whole = balanceNum / divisor;
+          const fractional = balanceNum % divisor;
+          const balanceFormatted = `${whole}.${fractional.toString().padStart(decimals, '0').slice(0, 4)}`;
+
+          // Determine if this is MOVE (AptosCoin or FA metadata 0x...a)
+          const assetType = meta.asset_type || bal.asset_type || '';
+          const isMoveToken = assetType === '0x1::aptos_coin::AptosCoin'
+            || assetType.replace(/^0x0+/, '0x') === '0xa';
+          const isFA = meta.token_standard === 'v2';
+
+          let symbol = meta.symbol || 'UNK';
+          let name = meta.name || symbol;
+
+          if (isMoveToken) {
+            symbol = 'MOVE';
+            name = 'Movement';
+          }
+
+          coins.push({
+            coinType: isMoveToken ? '0x1::aptos_coin::AptosCoin' : assetType,
+            name,
+            symbol,
+            decimals,
+            balance: amount,
+            balanceFormatted,
+            isFungibleAsset: isFA,
+            faMetadata: isFA ? assetType : undefined,
+            verified: isMoveToken,
+          });
+        }
+
+        // Deduplicate: if MOVE appears as both v1 and v2, keep the one with higher balance
+        const moveCoins = coins.filter(c => c.symbol === 'MOVE');
+        const otherCoins = coins.filter(c => c.symbol !== 'MOVE');
+        if (moveCoins.length > 1) {
+          moveCoins.sort((a, b) => (BigInt(b.balance) > BigInt(a.balance) ? 1 : -1));
+          otherCoins.unshift(moveCoins[0]);
+        } else if (moveCoins.length === 1) {
+          otherCoins.unshift(moveCoins[0]);
+        }
+
+        // Sort: MOVE first (already done), then by balance descending
+        otherCoins.sort((a, b) => {
           if (a.symbol === 'MOVE') return -1;
           if (b.symbol === 'MOVE') return 1;
           return BigInt(b.balance) > BigInt(a.balance) ? 1 : -1;
         });
 
-        return coins;
+        return otherCoins;
       } catch (error) {
-        console.error('Failed to fetch account coins:', error);
         return [];
       }
     },
@@ -123,7 +170,6 @@ export function useMultisigAccount(address: string) {
 
         return resource;
       } catch (error) {
-        console.error('Failed to fetch multisig account:', error);
         return null;
       }
     },
@@ -135,9 +181,10 @@ export function useMultisigAccount(address: string) {
 // Fetch all watched vaults from local storage
 export function useWatchedVaults() {
   return useQuery({
-    queryKey: ['watched-vaults'],
+    queryKey: ['watched-vaults', getCurrentNetwork().explorerNetwork],
     queryFn: async () => {
-      const saved = storage.get<Vault[]>(STORAGE_KEYS.WATCHED_VAULTS) || [];
+      migrateVaultsStorage();
+      const saved = storage.get<Vault[]>(getVaultsKey()) || [];
 
       // Fetch on-chain data for each vault
       const vaultsWithData = await Promise.all(
@@ -149,28 +196,199 @@ export function useWatchedVaults() {
               resourceType: `${MODULES.MULTISIG}::MultisigAccount`,
             });
 
-            // Fetch MOVE balance
-            const balance = await aptosClient.getAccountCoinAmount({
-              accountAddress: vault.address,
-              coinType: MODULES.MOVE_COIN_TYPE,
-            });
+            // Fetch MOVE balance via indexer (handles both legacy Coin and FA)
+            // Balance is stored in MOVE units (not octas) to avoid JS number precision loss
+            let balance = 0;
+            try {
+              const network = getCurrentNetwork();
+              const balQuery = `
+                query GetMoveBalance($address: String!) {
+                  current_fungible_asset_balances(
+                    where: {
+                      owner_address: { _eq: $address },
+                      asset_type: { _in: ["0x1::aptos_coin::AptosCoin", "0x000000000000000000000000000000000000000000000000000000000000000a"] }
+                    }
+                  ) {
+                    amount
+                  }
+                }
+              `;
+              const resp = await fetch(network.indexer, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query: balQuery, variables: { address: vault.address } }),
+              });
+              if (resp.ok) {
+                const json = await resp.json();
+                const balances = json?.data?.current_fungible_asset_balances || [];
+                for (const bal of balances) {
+                  // Use BigInt to avoid precision loss on large balances (> MAX_SAFE_INTEGER)
+                  const amtBigInt = BigInt(bal.amount || '0');
+                  const wholeMOVE = Number(amtBigInt / 100000000n);
+                  const fracMOVE = Number(amtBigInt % 100000000n) / 1e8;
+                  const moveAmt = wholeMOVE + fracMOVE;
+                  if (moveAmt > balance) balance = moveAmt;
+                }
+              }
+            } catch {
+              // Indexer unavailable, try legacy RPC fallback
+              try {
+                const octasBalance = await aptosClient.getAccountCoinAmount({
+                  accountAddress: vault.address,
+                  coinType: MODULES.MOVE_COIN_TYPE,
+                });
+                balance = octasBalance / 1e8;
+              } catch {
+                // No balance found
+              }
+            }
 
             return {
               ...vault,
               owners: resource.owners,
               threshold: parseInt(resource.num_signatures_required),
-              balance: balance || 0,
+              balance,
             };
-          } catch (error) {
-            console.error(`Failed to fetch data for vault ${vault.address}:`, error);
+          } catch (error: any) {
+            // If the resource doesn't exist on this network, exclude the vault
+            const msg = error?.message || '';
+            if (msg.includes('resource_not_found') || msg.includes('account_not_found')) {
+              return null;
+            }
+            // For transient errors (network issues), keep the vault with stale data
             return vault;
           }
         })
       );
 
-      return vaultsWithData;
+      const validVaults = vaultsWithData.filter((v): v is Vault => v !== null);
+
+      // If some vaults were removed (don't exist on this network), update storage
+      if (validVaults.length < saved.length) {
+        const validAddresses = new Set(validVaults.map(v => v.address));
+        const cleaned = saved.filter(v => validAddresses.has(v.address));
+        storage.set(getVaultsKey(), cleaned);
+      }
+
+      return validVaults;
     },
     refetchInterval: 10000,
+  });
+}
+
+// Auto-discover multisig vaults the connected wallet is part of
+export function useDiscoverVaults() {
+  const { account, connected } = useWallet();
+  const queryClient = useQueryClient();
+
+  return useQuery({
+    queryKey: ['discover-vaults', account?.address?.toString()],
+    queryFn: async () => {
+      const address = account?.address?.toString();
+      if (!address) return { discovered: 0, total: 0 };
+
+      const network = getCurrentNetwork();
+
+      try {
+        // Fetch user's transactions from REST API
+        const response = await fetch(
+          `${network.rpc}/accounts/${address}/transactions?limit=200`
+        );
+        if (!response.ok) return { discovered: 0, total: 0 };
+
+        const transactions = await response.json();
+        const multisigAddresses = new Set<string>();
+
+        for (const tx of transactions) {
+          const func = tx.payload?.function || '';
+          if (!func.includes('multisig_account')) continue;
+
+          if (func.includes('create_with_owners')) {
+            // For creation, extract multisig address from events or changes
+            for (const event of tx.events || []) {
+              if (event.type?.includes('0x1::account::CreateAccount')) {
+                if (event.data?.created) {
+                  multisigAddresses.add(event.data.created.toLowerCase());
+                }
+              }
+              if (event.type?.includes('multisig_account')) {
+                const addr = event.data?.multisig_account || event.data?.account;
+                if (addr) multisigAddresses.add(addr.toLowerCase());
+              }
+            }
+            for (const change of tx.changes || []) {
+              if (
+                change.type === 'write_resource' &&
+                change.data?.type?.includes('MultisigAccount') &&
+                change.address
+              ) {
+                multisigAddresses.add(change.address.toLowerCase());
+              }
+            }
+          } else {
+            // For approve, reject, execute, create_transaction - first arg is multisig address
+            const args = tx.payload?.arguments || [];
+            if (args[0] && typeof args[0] === 'string' && isValidAddress(args[0])) {
+              multisigAddresses.add(expandAddress(args[0]).toLowerCase());
+            }
+          }
+        }
+
+        if (multisigAddresses.size === 0) return { discovered: 0, total: 0 };
+
+        // Filter out already-watched vaults
+        const saved = storage.get<Vault[]>(getVaultsKey()) || [];
+        const savedAddresses = new Set(saved.map((v) => v.address.toLowerCase()));
+
+        const newAddresses = [...multisigAddresses].filter(
+          (addr) => !savedAddresses.has(addr) && !savedAddresses.has(`0x${addr.replace('0x', '').padStart(64, '0')}`)
+        );
+
+        // Verify each is a valid multisig where the user is still an owner
+        let discovered = 0;
+        for (const addr of newAddresses) {
+          try {
+            const normalizedAddr = addr.startsWith('0x') ? addr : `0x${addr}`;
+            const resource = await aptosClient.getAccountResource<MultisigAccountResource>({
+              accountAddress: normalizedAddr,
+              resourceType: `${MODULES.MULTISIG}::MultisigAccount`,
+            });
+
+            const isOwner = resource.owners?.some(
+              (owner: string) => owner.toLowerCase() === address.toLowerCase()
+            );
+
+            if (isOwner) {
+              const fullAddr = expandAddress(normalizedAddr);
+              // Double-check not already saved (with normalized address)
+              if (!saved.some((v) => v.address.toLowerCase() === fullAddr.toLowerCase())) {
+                saved.push({
+                  address: fullAddr,
+                  name: `Vault ${saved.length + 1}`,
+                  owners: resource.owners,
+                  threshold: parseInt(resource.num_signatures_required),
+                });
+                discovered++;
+              }
+            }
+          } catch {
+            // Skip invalid addresses
+          }
+        }
+
+        if (discovered > 0) {
+          storage.set(getVaultsKey(), saved);
+          queryClient.invalidateQueries({ queryKey: ['watched-vaults', getCurrentNetwork().explorerNetwork] });
+        }
+
+        return { discovered, total: multisigAddresses.size };
+      } catch (error) {
+        return { discovered: 0, total: 0 };
+      }
+    },
+    enabled: connected && !!account?.address,
+    staleTime: 60000, // Only re-run every 60 seconds
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -180,7 +398,7 @@ export function useAddVault() {
 
   return useMutation({
     mutationFn: async (vault: { address: string; name: string }) => {
-      const saved = storage.get<Vault[]>(STORAGE_KEYS.WATCHED_VAULTS) || [];
+      const saved = storage.get<Vault[]>(getVaultsKey()) || [];
 
       // Check if already exists
       if (saved.some((v) => v.address === vault.address)) {
@@ -204,28 +422,11 @@ export function useAddVault() {
         balance: 0,
       };
 
-      storage.set(STORAGE_KEYS.WATCHED_VAULTS, [...saved, newVault]);
+      storage.set(getVaultsKey(), [...saved, newVault]);
       return newVault;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['watched-vaults'] });
-    },
-  });
-}
-
-// Remove vault from watch list
-export function useRemoveVault() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (address: string) => {
-      const saved = storage.get<Vault[]>(STORAGE_KEYS.WATCHED_VAULTS) || [];
-      const filtered = saved.filter((v) => v.address !== address);
-      storage.set(STORAGE_KEYS.WATCHED_VAULTS, filtered);
-      return filtered;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['watched-vaults'] });
+      queryClient.invalidateQueries({ queryKey: ['watched-vaults', getCurrentNetwork().explorerNetwork] });
     },
   });
 }
@@ -247,25 +448,14 @@ export function useMultisigTransactions(address: string) {
         const nextTransactionId = parseInt(resource.next_sequence_number || '0');
         const lastExecutedId = parseInt(resource.last_executed_sequence_number || '-1');
 
-        console.log('Multisig state:', {
-          address,
-          nextTransactionId,
-          lastExecutedId,
-          tableHandle: resource.transactions?.handle,
-          resource: resource,
-        });
-
         // If there are no transactions yet
         if (nextTransactionId === 0) {
-          console.log('No transactions exist yet (nextTransactionId is 0)');
           return [];
         }
 
-        console.log(`Found ${nextTransactionId} transactions to fetch`);
 
         // Check if transactions table handle exists
         if (!resource.transactions || !resource.transactions.handle) {
-          console.warn('Transactions table handle not found');
           return [];
         }
 
@@ -278,12 +468,10 @@ export function useMultisigTransactions(address: string) {
         // Transaction IDs start from 1, not 0
         const startId = Math.max(1, lastExecutedId + 1);
 
-        console.log(`Fetching transactions from ${startId} to ${nextTransactionId - 1}`);
 
         for (let id = startId; id < nextTransactionId; id++) {
           try {
             // Try to fetch the transaction from the table using view function
-            console.log(`Attempting to fetch transaction ${id} from table ${resource.transactions.handle}`);
 
             const tableItem = await aptosClient.getTableItem<any>({
               handle: resource.transactions.handle,
@@ -294,7 +482,6 @@ export function useMultisigTransactions(address: string) {
               },
             });
 
-            console.log(`Successfully fetched transaction ${id}:`, tableItem);
 
             // Parse the votes from the data array
             // votes.data is an array of {key: address, value: boolean}
@@ -307,7 +494,6 @@ export function useMultisigTransactions(address: string) {
               .filter((v: { key: string; value: boolean }) => v.value === false)
               .map((v: { key: string; value: boolean }) => v.key);
 
-            console.log(`Transaction ${id} votes:`, { approvers, rejectors, votesData });
 
             // Parse the transaction data
             const proposal: Proposal = {
@@ -325,18 +511,14 @@ export function useMultisigTransactions(address: string) {
             // Transaction might not exist at this ID (executed and removed)
             const errorMessage = error?.message || '';
             if (errorMessage.includes('table_item_not_found')) {
-              console.log(`Transaction ${id} not found (likely executed and removed)`);
               // Skip this transaction - it was executed
               continue;
             }
-            console.log(`Failed to fetch transaction ${id}:`, errorMessage);
-            console.error('Full error:', error);
           }
         }
 
         return transactions.reverse(); // Show newest first
       } catch (error) {
-        console.error('Failed to fetch transactions:', error);
         return [];
       }
     },
@@ -356,13 +538,6 @@ export function useCreateMultisig() {
         throw new Error('Wallet not connected');
       }
 
-      console.log('Creating multisig with:', {
-        owners,
-        threshold: threshold.toString(),
-        name,
-        function: `${MODULES.MULTISIG}::${MULTISIG_FUNCTIONS.CREATE_WITH_OWNERS}`,
-      });
-
       const payload = {
         function: `${MODULES.MULTISIG}::${MULTISIG_FUNCTIONS.CREATE_WITH_OWNERS}` as `${string}::${string}::${string}`,
         typeArguments: [],
@@ -375,11 +550,9 @@ export function useCreateMultisig() {
       };
 
       try {
-        console.log('Calling signAndSubmitTransaction...');
         const response = await signAndSubmitTransaction({
           data: payload as any,
         });
-        console.log('Transaction submitted successfully:', response);
 
         // Wait for transaction
         await aptosClient.waitForTransaction({
@@ -390,7 +563,6 @@ export function useCreateMultisig() {
         const multisigAddress = await getMultisigAddressFromTransaction(response.hash);
 
         if (!multisigAddress) {
-          console.warn('Could not extract multisig address from transaction');
         }
 
         return {
@@ -399,7 +571,6 @@ export function useCreateMultisig() {
           vaultName: name, // Pass through the name
         };
       } catch (innerError) {
-        console.error('Transaction submission failed:', innerError);
         const message = innerError && typeof innerError === 'object' && 'message' in innerError
           ? (innerError as any).message
           : 'Transaction failed';
@@ -409,17 +580,17 @@ export function useCreateMultisig() {
     onSuccess: (data) => {
       // If we found the multisig address, add it to watched vaults
       if (data.multisigAddress) {
-        const saved = storage.get<Vault[]>(STORAGE_KEYS.WATCHED_VAULTS) || [];
+        const saved = storage.get<Vault[]>(getVaultsKey()) || [];
         const newVault: Vault = {
           address: data.multisigAddress,
           name: data.vaultName || `Multisig ${saved.length + 1}`,
         };
 
         // Add to storage
-        storage.set(STORAGE_KEYS.WATCHED_VAULTS, [...saved, newVault]);
+        storage.set(getVaultsKey(), [...saved, newVault]);
 
         // Invalidate the query to refresh the list
-        queryClient.invalidateQueries({ queryKey: ['watched-vaults'] });
+        queryClient.invalidateQueries({ queryKey: ['watched-vaults', getCurrentNetwork().explorerNetwork] });
       }
     },
   });
@@ -431,161 +602,15 @@ export function useRenameVault() {
 
   return useMutation({
     mutationFn: async ({ address, name }: { address: string; name: string }) => {
-      const saved = storage.get<Vault[]>(STORAGE_KEYS.WATCHED_VAULTS) || [];
+      const saved = storage.get<Vault[]>(getVaultsKey()) || [];
       const updated = saved.map((v) =>
         v.address === address ? { ...v, name } : v
       );
-      storage.set(STORAGE_KEYS.WATCHED_VAULTS, updated);
+      storage.set(getVaultsKey(), updated);
       return { address, name };
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['watched-vaults'] });
-    },
-  });
-}
-
-// Propose a new transaction
-export function useCreateProposal(multisigAddress: string) {
-  const { signAndSubmitTransaction, account } = useWallet();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (payload: any) => {
-      if (!signAndSubmitTransaction || !account) {
-        throw new Error('Wallet not connected. Please connect your wallet and try again.');
-      }
-
-      try {
-        console.log('Creating proposal for multisig account:', multisigAddress);
-        console.log('Connected wallet:', account.address);
-        console.log('Payload:', payload);
-
-        // First verify we're an owner
-        const resource = await aptosClient.getAccountResource<MultisigAccountResource>({
-          accountAddress: multisigAddress,
-          resourceType: `${MODULES.MULTISIG}::MultisigAccount`,
-        });
-
-        const isOwner = resource.owners?.some(owner =>
-          owner.toLowerCase() === account.address.toString().toLowerCase()
-        );
-        console.log('Is wallet an owner?', isOwner, 'Owners:', resource.owners);
-
-        if (!isOwner) {
-          throw new Error('Your wallet is not an owner of this multisig account');
-        }
-
-        // Generate the BCS-serialized transaction payload
-        const serializedPayload = await generateMultisigPayload({
-          multisigAddress,
-          targetFunction: payload.function,
-          typeArguments: payload.typeArguments || [],
-          functionArguments: payload.functionArguments || [],
-        });
-
-        console.log('Serialized payload length:', serializedPayload.length);
-
-        // Try multiple approaches to pass the payload
-        // Approach 1: As hex string
-        const payloadHex = '0x' + Array.from(serializedPayload)
-          .map(b => b.toString(16).padStart(2, '0'))
-          .join('');
-
-        console.log('Trying with hex payload:', payloadHex.substring(0, 100) + '...');
-
-        const proposalPayload = {
-          function: '0x1::multisig_account::create_transaction' as `${string}::${string}::${string}`,
-          typeArguments: [],
-          functionArguments: [
-            multisigAddress,
-            payloadHex, // Try as hex string first
-          ],
-        };
-
-        console.log('Submitting create_transaction with payload:', {
-          ...proposalPayload,
-          functionArguments: [
-            multisigAddress,
-            `[${serializedPayload.length} bytes as hex]`, // Log byte count instead of full hex
-          ],
-        });
-
-        // Submit the transaction
-        const response = await signAndSubmitTransaction({
-          data: proposalPayload,
-        });
-
-        // Wait for confirmation
-        await aptosClient.waitForTransaction({
-          transactionHash: response.hash,
-        });
-
-        console.log('✓ Transaction submitted successfully! TX:', response.hash);
-
-        // Verify the proposal was actually created by checking the resource again
-        const updatedResource = await aptosClient.getAccountResource<MultisigAccountResource>({
-          accountAddress: multisigAddress,
-          resourceType: `${MODULES.MULTISIG}::MultisigAccount`,
-        });
-
-        const newNextId = parseInt(updatedResource.next_sequence_number || '0');
-        const oldNextId = parseInt(resource.next_sequence_number || '0');
-
-        console.log('Transaction ID before:', oldNextId, 'after:', newNextId);
-
-        if (newNextId <= oldNextId) {
-          console.error('WARNING: Transaction was submitted but next_transaction_id did not increment!');
-          console.error('This means the proposal was NOT actually created on-chain.');
-          console.error('Possible issues:');
-          console.error('1. Wrong module or function name');
-          console.error('2. Payload format is incorrect');
-          console.error('3. Module expects different parameters');
-
-          // Try to get the transaction details to see what happened
-          try {
-            const txDetails = await aptosClient.getTransactionByHash({
-              transactionHash: response.hash,
-            });
-            console.log('Transaction details:', txDetails);
-          } catch (e) {
-            console.error('Could not fetch transaction details:', e);
-          }
-
-          throw new Error('Proposal creation failed - transaction succeeded but no proposal was created');
-        }
-
-        console.log('✓ Proposal created successfully! New ID:', newNextId - 1);
-        return response;
-      } catch (error: any) {
-        console.error('Failed to create proposal:', error);
-
-        // Provide helpful error messages
-        const errorMessage = error?.message || 'Unknown error';
-
-        if (errorMessage.includes('FUNCTION_NOT_FOUND')) {
-          throw new Error('The multisig module function was not found. Please check that the multisig is properly initialized.');
-        } else if (errorMessage.includes('INVALID_ARGUMENT') || errorMessage.includes('EBYTES_TOO_LARGE')) {
-          throw new Error('Invalid transaction format. The payload may be too large or incorrectly formatted.');
-        } else if (errorMessage.includes('ENOT_OWNER')) {
-          throw new Error('You are not an owner of this multisig account.');
-        } else if (errorMessage.includes('Failed to serialize')) {
-          throw new Error('Failed to serialize the transaction payload. The transaction may be malformed.');
-        } else {
-          throw new Error(`Failed to create proposal: ${errorMessage}`);
-        }
-      }
-    },
-    onSuccess: async () => {
-      console.log('Proposal created, invalidating queries for:', multisigAddress);
-
-      // Invalidate and refetch the multisig transactions
-      await queryClient.invalidateQueries({ queryKey: ['multisig-transactions', multisigAddress] });
-      await queryClient.refetchQueries({ queryKey: ['multisig-transactions', multisigAddress] });
-
-      // Also invalidate the multisig account resource
-      await queryClient.invalidateQueries({ queryKey: ['multisig', multisigAddress] });
-
-      console.log('Queries invalidated and refetched');
+      queryClient.invalidateQueries({ queryKey: ['watched-vaults', getCurrentNetwork().explorerNetwork] });
     },
   });
 }
@@ -597,10 +622,6 @@ export function useApproveTransaction(multisigAddress: string) {
 
   return useMutation({
     mutationFn: async (transactionId: number) => {
-      console.log('useApproveTransaction mutationFn called');
-      console.log('signAndSubmitTransaction available:', !!signAndSubmitTransaction);
-      console.log('account:', account);
-      console.log('connected:', connected);
 
       if (!signAndSubmitTransaction || !account) {
         throw new Error('Wallet not connected. Please connect your wallet and try again.');
@@ -612,19 +633,16 @@ export function useApproveTransaction(multisigAddress: string) {
         functionArguments: [multisigAddress, transactionId.toString()],
       };
 
-      console.log('Approve payload:', payload);
 
       const response = await signAndSubmitTransaction({
         data: payload,
       });
 
-      console.log('signAndSubmitTransaction response:', response);
 
       await aptosClient.waitForTransaction({
         transactionHash: response.hash,
       });
 
-      console.log('Approve transaction confirmed!');
       return response;
     },
     onSuccess: () => {
@@ -644,7 +662,6 @@ export function useRejectTransaction(multisigAddress: string) {
         throw new Error('Wallet not connected. Please connect your wallet and try again.');
       }
 
-      console.log('Rejecting transaction:', transactionId);
 
       const payload = {
         function: `${MODULES.MULTISIG}::${MULTISIG_FUNCTIONS.REJECT}` as `${string}::${string}::${string}`,
@@ -660,11 +677,81 @@ export function useRejectTransaction(multisigAddress: string) {
         transactionHash: response.hash,
       });
 
-      console.log('Reject transaction confirmed!');
       return response;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['multisig-transactions', multisigAddress] });
+    },
+  });
+}
+
+// Reject a broken proposal and execute the rejection to clear it from the queue.
+// Used to clean up old proposals with invalid (JSON) payloads that block execution.
+export function useCleanupProposal(multisigAddress: string) {
+  const { signAndSubmitTransaction, account } = useWallet();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (transactionId: number) => {
+      if (!signAndSubmitTransaction || !account) {
+        throw new Error('Wallet not connected');
+      }
+
+      // Step 1: Cast a reject vote on the broken proposal
+      const rejectPayload = {
+        function: `${MODULES.MULTISIG}::${MULTISIG_FUNCTIONS.REJECT}` as `${string}::${string}::${string}`,
+        typeArguments: [],
+        functionArguments: [multisigAddress, transactionId.toString()],
+      };
+
+      const rejectResponse = await signAndSubmitTransaction({ data: rejectPayload });
+      await aptosClient.waitForTransaction({ transactionHash: rejectResponse.hash });
+
+      // Step 2: Execute the rejection to clear the proposal from the queue
+      const executeRejectedPayload = {
+        function: `${MODULES.MULTISIG}::execute_rejected_transaction` as `${string}::${string}::${string}`,
+        typeArguments: [],
+        functionArguments: [multisigAddress],
+      };
+
+      const execResponse = await signAndSubmitTransaction({ data: executeRejectedPayload });
+      await aptosClient.waitForTransaction({ transactionHash: execResponse.hash });
+
+      return execResponse;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['multisig-transactions', multisigAddress] });
+      queryClient.invalidateQueries({ queryKey: ['multisig', multisigAddress] });
+      queryClient.invalidateQueries({ queryKey: ['watched-vaults', getCurrentNetwork().explorerNetwork] });
+    },
+  });
+}
+
+// Execute a rejected transaction - clears it from the queue when rejections >= threshold
+export function useExecuteRejectedTransaction(multisigAddress: string) {
+  const { signAndSubmitTransaction, account } = useWallet();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (_transactionId: number) => {
+      if (!signAndSubmitTransaction || !account) {
+        throw new Error('Wallet not connected. Please connect your wallet and try again.');
+      }
+
+      const executeRejectedPayload = {
+        function: `${MODULES.MULTISIG}::execute_rejected_transaction` as `${string}::${string}::${string}`,
+        typeArguments: [],
+        functionArguments: [multisigAddress],
+      };
+
+      const response = await signAndSubmitTransaction({ data: executeRejectedPayload });
+      await aptosClient.waitForTransaction({ transactionHash: response.hash });
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['multisig-transactions', multisigAddress] });
+      queryClient.invalidateQueries({ queryKey: ['multisig', multisigAddress] });
+      queryClient.invalidateQueries({ queryKey: ['watched-vaults', getCurrentNetwork().explorerNetwork] });
     },
   });
 }
@@ -681,8 +768,6 @@ export function useExecuteTransaction(multisigAddress: string) {
         throw new Error('Wallet not connected. Please connect your wallet and try again.');
       }
 
-      console.log('Executing multisig transaction:', transactionId);
-      console.log('Multisig address:', multisigAddress);
 
       try {
         // Create the multisig execution payload
@@ -691,7 +776,6 @@ export function useExecuteTransaction(multisigAddress: string) {
           new MultiSig(AccountAddress.fromString(multisigAddress))
         );
 
-        console.log('Created TransactionPayloadMultiSig:', multisigPayload);
 
         // Build the transaction using buildTransaction with the raw payload
         const transaction = await buildTransaction({
@@ -700,7 +784,6 @@ export function useExecuteTransaction(multisigAddress: string) {
           payload: multisigPayload,
         });
 
-        console.log('Built transaction:', transaction);
 
         // Use the wallet adapter features to sign and submit (Nightly approach for Movement)
         const signAndSubmit = (wallet as any).features?.['aptos:signAndSubmitTransaction'];
@@ -711,12 +794,10 @@ export function useExecuteTransaction(multisigAddress: string) {
         // Pass the SimpleTransaction directly
         const response = await signAndSubmit.signAndSubmitTransaction(transaction);
 
-        console.log('Transaction response:', response);
 
         // Handle response - it might be wrapped in a status object
         const txHash = (response as any)?.hash || (response as any)?.args?.hash;
         if (!txHash) {
-          console.log('Full response object:', JSON.stringify(response, null, 2));
           throw new Error('Could not get transaction hash from response');
         }
 
@@ -725,18 +806,15 @@ export function useExecuteTransaction(multisigAddress: string) {
           transactionHash: txHash,
         });
 
-        console.log('Execute transaction confirmed!', txHash);
         return { hash: txHash };
       } catch (error: any) {
-        console.error('Failed to execute:', error?.message || error);
-        console.error('Full error:', error);
         throw new Error(`Failed to execute: ${error?.message || 'Unknown error'}`);
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['multisig-transactions', multisigAddress] });
       queryClient.invalidateQueries({ queryKey: ['multisig', multisigAddress] });
-      queryClient.invalidateQueries({ queryKey: ['watched-vaults'] });
+      queryClient.invalidateQueries({ queryKey: ['watched-vaults', getCurrentNetwork().explorerNetwork] });
     },
   });
 }

@@ -181,12 +181,12 @@ export function CreateMultisig() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto p-6 bg-white rounded-xl shadow-lg">
-      <h2 className="text-2xl font-bold mb-6">Create New Multisig</h2>
+    <div className="max-w-2xl mx-auto p-6 bg-white rounded-xl shadow-card border border-neutral-200">
+      <h2 className="text-2xl font-bold text-neutral-800 tracking-heading mb-6">Create New Multisig</h2>
 
       {/* Vault Name */}
       <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-neutral-700 mb-1">
           Vault Name
         </label>
         <input
@@ -194,17 +194,17 @@ export function CreateMultisig() {
           value={vaultName}
           onChange={(e) => setVaultName(e.target.value)}
           placeholder="e.g., Treasury, Team Fund, Operations..."
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-movement-300"
         />
-        <p className="mt-1 text-xs text-gray-500">
+        <p className="mt-1 text-xs text-neutral-500">
           Give your vault a memorable name to easily identify it
         </p>
       </div>
 
       {/* Current Account Notice */}
       {account && (
-        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-sm text-blue-800">
+        <div className="mb-6 p-4 bg-movement-50 border border-movement-200 rounded-lg">
+          <p className="text-sm text-movement-800">
             <span className="font-semibold">Your wallet address will be added as an owner:</span>
             <br />
             <code className="mt-1 block font-mono text-xs">{getAccountAddress()}</code>
@@ -214,9 +214,9 @@ export function CreateMultisig() {
 
       {/* Owners Section */}
       <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-700 mb-3">
+        <label className="block text-sm font-medium text-neutral-700 mb-3">
           Additional Owners (Optional)
-          <span className="text-xs text-gray-500 ml-2">Your wallet is automatically included</span>
+          <span className="text-xs text-neutral-400 ml-2">Your wallet is automatically included</span>
         </label>
 
         <div className="space-y-3">
@@ -228,8 +228,8 @@ export function CreateMultisig() {
                   value={owner}
                   onChange={(e) => updateOwner(index, e.target.value)}
                   placeholder="0x... (owner address)"
-                  className={`flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm ${
-                    ownerErrors[index] ? 'border-red-500' : 'border-gray-300'
+                  className={`flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-movement-300 font-mono text-sm ${
+                    ownerErrors[index] ? 'border-red-500' : 'border-neutral-200'
                   }`}
                 />
                 {owners.length > 1 && (
@@ -250,7 +250,7 @@ export function CreateMultisig() {
 
         <button
           onClick={addOwner}
-          className="mt-3 flex items-center gap-2 px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+          className="mt-3 flex items-center gap-2 px-4 py-2 text-movement-600 hover:bg-movement-50 rounded-lg transition-colors"
         >
           <Plus className="w-4 h-4" />
           Add Owner
@@ -259,10 +259,10 @@ export function CreateMultisig() {
 
       {/* Threshold Section */}
       <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-neutral-700 mb-1">
           Approval Threshold
         </label>
-        <p className="text-xs text-gray-500 mb-3">
+        <p className="text-xs text-neutral-500 mb-3">
           Number of approvals required to execute transactions
         </p>
 
@@ -284,9 +284,9 @@ export function CreateMultisig() {
                 setThreshold(value);
               }
             }}
-            className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            className="w-24 px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-movement-300 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
           />
-          <span className="text-gray-600">
+          <span className="text-neutral-600">
             out of {Math.max(1, owners.filter(o => o.trim() !== '').length + 1)} owners (including you)
           </span>
         </div>
@@ -304,10 +304,10 @@ export function CreateMultisig() {
 
       {/* Success Message */}
       {showSuccess && (
-        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+        <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
           <div className="flex items-center gap-2">
-            <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
-            <p className="text-sm text-green-800">
+            <CheckCircle className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+            <p className="text-sm text-emerald-800">
               Multisig created successfully!
             </p>
           </div>
@@ -319,7 +319,7 @@ export function CreateMultisig() {
         <button
           onClick={validateAndCreate}
           disabled={createMultisig.isPending}
-          className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-medium hover:from-blue-700 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex-1 px-6 py-3 bg-movement-400 hover:bg-movement-500 text-neutral-900 rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {createMultisig.isPending ? (
             <span className="flex items-center justify-center gap-2">
@@ -333,9 +333,9 @@ export function CreateMultisig() {
       </div>
 
       {/* Info Box */}
-      <div className="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-        <h3 className="font-semibold text-sm text-gray-900 mb-2">Important Notes:</h3>
-        <ul className="text-xs text-gray-600 space-y-1 list-disc list-inside">
+      <div className="mt-6 p-4 bg-neutral-50 border border-neutral-200 rounded-lg">
+        <h3 className="font-semibold text-sm text-neutral-800 mb-2">Important Notes:</h3>
+        <ul className="text-xs text-neutral-600 space-y-1 list-disc list-inside">
           <li>The creator pays the gas fees for creating the multisig</li>
           <li>All owners will have equal rights in the multisig</li>
           <li>Threshold can be updated later with owner approval</li>

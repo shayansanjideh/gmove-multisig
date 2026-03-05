@@ -2,6 +2,7 @@
 
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { CheckCircle, XCircle, X, ExternalLink, Copy, Check } from 'lucide-react';
+import { getCurrentNetwork } from '@/lib/aptos';
 
 interface Toast {
   id: string;
@@ -48,29 +49,29 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
   return (
     <div
       className={`
-        relative flex flex-col gap-2 p-4 rounded-lg shadow-lg border
+        relative flex flex-col gap-2 p-4 rounded-xl shadow-dropdown border
         animate-slide-in-right
-        ${toast.type === 'success' ? 'bg-green-50 border-green-200' : ''}
+        ${toast.type === 'success' ? 'bg-emerald-50 border-emerald-200' : ''}
         ${toast.type === 'error' ? 'bg-red-50 border-red-200' : ''}
-        ${toast.type === 'info' ? 'bg-blue-50 border-blue-200' : ''}
+        ${toast.type === 'info' ? 'bg-movement-50 border-movement-200' : ''}
       `}
     >
       <div className="flex items-start gap-3">
-        {toast.type === 'success' && <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />}
+        {toast.type === 'success' && <CheckCircle className="w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5" />}
         {toast.type === 'error' && <XCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />}
 
         <div className="flex-1 min-w-0">
           <p className={`font-medium ${
-            toast.type === 'success' ? 'text-green-800' :
-            toast.type === 'error' ? 'text-red-800' : 'text-blue-800'
+            toast.type === 'success' ? 'text-emerald-800' :
+            toast.type === 'error' ? 'text-red-800' : 'text-movement-800'
           }`}>
             {toast.title}
           </p>
 
           {toast.message && (
             <p className={`text-sm mt-1 ${
-              toast.type === 'success' ? 'text-green-700' :
-              toast.type === 'error' ? 'text-red-700' : 'text-blue-700'
+              toast.type === 'success' ? 'text-emerald-700' :
+              toast.type === 'error' ? 'text-red-700' : 'text-movement-700'
             }`}>
               {toast.message}
             </p>
@@ -79,7 +80,7 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
           {toast.txHash && (
             <div className="mt-2 space-y-2">
               <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-500">Transaction Hash:</span>
+                <span className="text-xs text-neutral-500">Transaction Hash:</span>
                 <code className="text-xs font-mono bg-white/50 px-2 py-0.5 rounded">
                   {truncateHash(toast.txHash)}
                 </code>
@@ -89,18 +90,18 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
                   title="Copy hash"
                 >
                   {copied ? (
-                    <Check className="w-3.5 h-3.5 text-green-600" />
+                    <Check className="w-3.5 h-3.5 text-emerald-600" />
                   ) : (
-                    <Copy className="w-3.5 h-3.5 text-gray-500" />
+                    <Copy className="w-3.5 h-3.5 text-neutral-500" />
                   )}
                 </button>
               </div>
 
               <a
-                href={`${EXPLORER_URL}/${toast.txHash}?network=testnet`}
+                href={`${EXPLORER_URL}/${toast.txHash}?network=${getCurrentNetwork().explorerNetwork}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 hover:underline"
+                className="inline-flex items-center gap-1.5 text-sm text-movement-700 hover:text-movement-800 hover:underline"
               >
                 <ExternalLink className="w-3.5 h-3.5" />
                 View on Explorer
@@ -113,7 +114,7 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
           onClick={onClose}
           className="p-1 hover:bg-black/5 rounded transition-colors"
         >
-          <X className="w-4 h-4 text-gray-500" />
+          <X className="w-4 h-4 text-neutral-500" />
         </button>
       </div>
     </div>
@@ -133,7 +134,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       type: 'success',
       title,
       txHash,
-      duration: txHash ? 12000 : 5000, // Longer duration if showing tx hash
+      duration: txHash ? 12000 : 5000,
     });
   };
 
@@ -164,22 +165,6 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           />
         ))}
       </div>
-
-      <style jsx global>{`
-        @keyframes slide-in-right {
-          from {
-            transform: translateX(100%);
-            opacity: 0;
-          }
-          to {
-            transform: translateX(0);
-            opacity: 1;
-          }
-        }
-        .animate-slide-in-right {
-          animation: slide-in-right 0.3s ease-out;
-        }
-      `}</style>
     </ToastContext.Provider>
   );
 }

@@ -4,23 +4,23 @@ import { AlertCircle, HelpCircle, Shield, Wallet, Key } from 'lucide-react';
 
 export function FAQ() {
   return (
-    <div className="bg-white rounded-xl shadow-lg p-6">
-      <h2 className="text-lg font-semibold text-gray-900 mb-6 flex items-center gap-2">
+    <div className="bg-white rounded-xl shadow-card border border-neutral-200 p-6">
+      <h2 className="text-lg font-semibold text-neutral-800 mb-6 flex items-center gap-2">
         <HelpCircle className="w-5 h-5" />
         Frequently Asked Questions
       </h2>
 
       <div className="space-y-6">
         {/* Ledger Hardware Wallet Section */}
-        <div className="border border-gray-200 rounded-lg p-4">
+        <div className="border border-neutral-200 rounded-lg p-4">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 bg-amber-100 rounded-lg">
               <Wallet className="w-5 h-5 text-amber-600" />
             </div>
-            <h3 className="font-semibold text-gray-900">Ledger Hardware Wallet Setup</h3>
+            <h3 className="font-semibold text-neutral-800">Ledger Hardware Wallet Setup</h3>
           </div>
 
-          <div className="space-y-4 text-sm text-gray-600">
+          <div className="space-y-4 text-sm text-neutral-600">
             <p>
               If you are using a Ledger hardware wallet through Nightly, please ensure:
             </p>
@@ -40,13 +40,13 @@ export function FAQ() {
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
               <p className="text-amber-800">
                 <span className="font-semibold">Important:</span> Without Blind Signing enabled,
-                you won't be able to sign complex transactions like multisig operations.
+                you won&apos;t be able to sign complex transactions like multisig operations.
               </p>
             </div>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <p className="text-blue-800">
-                <span className="font-semibold">Tip:</span> In Developer Mode, we'll show you
+            <div className="bg-movement-50 border border-movement-200 rounded-lg p-3">
+              <p className="text-movement-800">
+                <span className="font-semibold">Tip:</span> In Developer Mode, we&apos;ll show you
                 the transaction hash to verify on your Ledger screen.
               </p>
             </div>
@@ -54,15 +54,15 @@ export function FAQ() {
         </div>
 
         {/* How Multisig Works */}
-        <div className="border border-gray-200 rounded-lg p-4">
+        <div className="border border-neutral-200 rounded-lg p-4">
           <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Shield className="w-5 h-5 text-blue-600" />
+            <div className="p-2 bg-movement-100 rounded-lg">
+              <Shield className="w-5 h-5 text-movement-600" />
             </div>
-            <h3 className="font-semibold text-gray-900">How Multisig Works</h3>
+            <h3 className="font-semibold text-neutral-800">How Multisig Works</h3>
           </div>
 
-          <div className="space-y-3 text-sm text-gray-600">
+          <div className="space-y-3 text-sm text-neutral-600">
             <p>
               A multisig (multi-signature) vault requires multiple approvals before any transaction can be executed.
             </p>
@@ -78,15 +78,15 @@ export function FAQ() {
         </div>
 
         {/* Transaction Threshold */}
-        <div className="border border-gray-200 rounded-lg p-4">
+        <div className="border border-neutral-200 rounded-lg p-4">
           <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <Key className="w-5 h-5 text-purple-600" />
+            <div className="p-2 bg-violet-100 rounded-lg">
+              <Key className="w-5 h-5 text-violet-600" />
             </div>
-            <h3 className="font-semibold text-gray-900">Approval Threshold</h3>
+            <h3 className="font-semibold text-neutral-800">Approval Threshold</h3>
           </div>
 
-          <div className="space-y-3 text-sm text-gray-600">
+          <div className="space-y-3 text-sm text-neutral-600">
             <p>
               The approval threshold determines how many owners must approve a transaction before it can be executed.
             </p>
@@ -102,15 +102,15 @@ export function FAQ() {
         </div>
 
         {/* Gas Fees */}
-        <div className="border border-gray-200 rounded-lg p-4">
+        <div className="border border-neutral-200 rounded-lg p-4">
           <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <AlertCircle className="w-5 h-5 text-green-600" />
+            <div className="p-2 bg-emerald-100 rounded-lg">
+              <AlertCircle className="w-5 h-5 text-emerald-600" />
             </div>
-            <h3 className="font-semibold text-gray-900">Gas Fees</h3>
+            <h3 className="font-semibold text-neutral-800">Gas Fees</h3>
           </div>
 
-          <div className="space-y-3 text-sm text-gray-600">
+          <div className="space-y-3 text-sm text-neutral-600">
             <p>
               Each action on the blockchain requires gas fees paid in MOVE:
             </p>
