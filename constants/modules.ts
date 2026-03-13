@@ -47,4 +47,5 @@ export const STORAGE_KEYS = {
   WATCHED_VAULTS: 'movement_multisig_vaults',
   SELECTED_VAULT: 'movement_selected_vault',
   NETWORK: 'movement_network',
+  CONTACTS: 'movement_multisig_contacts',
 } as const;

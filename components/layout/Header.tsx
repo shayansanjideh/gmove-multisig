@@ -1,6 +1,6 @@
 'use client';
 
-import { Shield, Plus, HelpCircle, AlertTriangle } from 'lucide-react';
+import { Shield, Plus, HelpCircle, AlertTriangle, BookUser } from 'lucide-react';
 import { WalletConnect } from '@/components/wallet/WalletConnect';
 import { NetworkSelector } from '@/components/wallet/NetworkSelector';
 import { useWallet } from '@aptos-labs/wallet-adapter-react';
@@ -69,6 +69,17 @@ export function Header() {
           >
             <Plus className="w-4 h-4" />
             Create Multisig
+          </Link>
+          <Link
+            href="/contacts"
+            className={`flex items-center gap-2 px-1 py-3 text-sm font-medium border-b-2 transition-colors ${
+              pathname === '/contacts'
+                ? 'border-movement-400 text-movement-400'
+                : 'border-transparent text-neutral-400 hover:text-neutral-200'
+            }`}
+          >
+            <BookUser className="w-4 h-4" />
+            Contacts
           </Link>
           <Link
             href="/faq"

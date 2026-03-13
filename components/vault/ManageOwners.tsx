@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { useWallet } from '@aptos-labs/wallet-adapter-react';
 import { useCreateProposalFixed } from '@/hooks/useMultisig-fixed';
 import { useNetwork } from '@/contexts/NetworkContext';
-import { isValidAddress, expandAddress, formatAddress } from '@/lib/aptos';
+import { isValidAddress, expandAddress } from '@/lib/aptos';
+import { AddressDisplay } from '@/components/ui/AddressDisplay';
 import { UserPlus, UserMinus, AlertCircle, Loader2, Info, Users, AlertTriangle } from 'lucide-react';
 import { MODULES, MULTISIG_FUNCTIONS } from '@/constants/modules';
 import { useToast } from '@/components/ui/toast';
@@ -198,7 +199,7 @@ export function ManageOwners({ vaultAddress, currentOwners, threshold, onSuccess
               <div className="w-6 h-6 rounded-full bg-movement-400 flex items-center justify-center text-xs text-neutral-900">
                 {i + 1}
               </div>
-              <span>{formatAddress(owner, 8)}</span>
+              <AddressDisplay address={owner} truncateLength={8} />
             </div>
           ))}
         </div>

@@ -2,9 +2,10 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Users, Shield, Coins, ExternalLink, Pencil, Check, X } from 'lucide-react';
-import { formatAddress } from '@/lib/aptos';
 import { formatCompactBalance } from '@/lib/utils';
 import type { Vault } from '@/types/multisig';
+import { AddressDisplay } from '@/components/ui/AddressDisplay';
+import { useContacts } from '@/contexts/ContactsContext';
 
 interface VaultCardProps {
   vault: Vault;
@@ -13,6 +14,7 @@ interface VaultCardProps {
 }
 
 export function VaultCard({ vault, onClick, onRename }: VaultCardProps) {
+  const { getTagForAddress } = useContacts();
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(vault.name);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -90,8 +92,8 @@ export function VaultCard({ vault, onClick, onRename }: VaultCardProps) {
               )}
             </div>
           )}
-          <p className="text-sm text-neutral-400 font-mono mt-1">
-            {formatAddress(vault.address)}
+          <p className="text-sm text-neutral-400 mt-1">
+            <AddressDisplay address={vault.address} truncateLength={6} />
           </p>
         </div>
         <ExternalLink className="w-5 h-5 text-neutral-400 group-hover:text-movement-500 transition-colors shrink-0 ml-2" />
@@ -130,17 +132,20 @@ export function VaultCard({ vault, onClick, onRename }: VaultCardProps) {
       <div className="mt-4 pt-4 border-t border-neutral-100">
         <div className="flex items-center justify-between">
           <div className="flex -space-x-2">
-            {(vault.owners ?? []).slice(0, 3).map((owner) => (
-              <div
-                key={owner}
-                className="w-8 h-8 rounded-full bg-movement-400 border-2 border-white flex items-center justify-center"
-                title={owner}
-              >
-                <span className="text-xs text-neutral-900 font-medium">
-                  {owner.slice(2, 4).toUpperCase()}
-                </span>
-              </div>
-            ))}
+            {(vault.owners ?? []).slice(0, 3).map((owner) => {
+              const tag = getTagForAddress(owner);
+              return (
+                <div
+                  key={owner}
+                  className="w-8 h-8 rounded-full bg-movement-400 border-2 border-white flex items-center justify-center"
+                  title={tag ? `${tag} (${owner})` : owner}
+                >
+                  <span className="text-xs text-neutral-900 font-medium">
+                    {tag ? tag.slice(0, 2).toUpperCase() : owner.slice(2, 4).toUpperCase()}
+                  </span>
+                </div>
+              );
+            })}
             {(vault.owners ?? []).length > 3 && (
               <div className="w-8 h-8 rounded-full bg-neutral-200 border-2 border-white flex items-center justify-center">
                 <span className="text-xs text-neutral-600 font-medium">

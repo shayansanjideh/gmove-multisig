@@ -5,6 +5,7 @@ import { useMultisigAccount } from '@/hooks/useMultisig';
 import { getCurrentNetwork } from '@/lib/aptos';
 import { CheckCircle, ExternalLink, RefreshCw, History, Copy, Check, ChevronDown, ChevronUp, ArrowRight, Coins, Ban } from 'lucide-react';
 import { formatCompactMoveAmount } from '@/lib/utils';
+import { AddressDisplay } from '@/components/ui/AddressDisplay';
 
 interface PastTransactionsProps {
   vaultAddress: string;
@@ -484,11 +485,6 @@ export function PastTransactions({ vaultAddress }: PastTransactionsProps) {
     return `${hash.slice(0, 10)}...${hash.slice(-8)}`;
   };
 
-  const truncateAddress = (address: string) => {
-    if (!address || address.length <= 14) return address || 'N/A';
-    return `${address.slice(0, 8)}...${address.slice(-6)}`;
-  };
-
   const copyHash = async (hash: string, e: React.MouseEvent) => {
     e.stopPropagation();
     await navigator.clipboard.writeText(hash);
@@ -599,7 +595,7 @@ export function PastTransactions({ vaultAddress }: PastTransactionsProps) {
                       {tx.details?.type === 'transfer' && tx.details.recipient && (
                         <div className="flex items-center gap-1 text-xs text-neutral-500">
                           <ArrowRight className="w-3 h-3" />
-                          <span>To: {truncateAddress(tx.details.recipient)}</span>
+                          <span>To: </span><AddressDisplay address={tx.details.recipient} truncateLength={6} className="text-xs text-neutral-500" />
                         </div>
                       )}
 
@@ -668,9 +664,7 @@ export function PastTransactions({ vaultAddress }: PastTransactionsProps) {
                         {tx.details.recipient && (
                           <div className="flex items-center justify-between">
                             <span className="text-xs text-neutral-500">Recipient</span>
-                            <code className="font-mono text-xs bg-white px-2 py-1 rounded border">
-                              {truncateAddress(tx.details.recipient)}
-                            </code>
+                            <AddressDisplay address={tx.details.recipient} truncateLength={8} showCopyIcon className="text-xs" />
                           </div>
                         )}
                       </>
@@ -693,9 +687,7 @@ export function PastTransactions({ vaultAddress }: PastTransactionsProps) {
                       <span className="text-xs text-neutral-500">
                         {tx.status === 'rejected' ? 'Proposed by' : 'Executed by'}
                       </span>
-                      <code className="font-mono text-xs bg-white px-2 py-1 rounded border">
-                        {truncateAddress(tx.sender)}
-                      </code>
+                      <AddressDisplay address={tx.sender} truncateLength={6} showCopyIcon className="text-xs" />
                     </div>
 
                     {/* Explorer link */}

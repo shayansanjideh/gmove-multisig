@@ -2,30 +2,15 @@
 
 import { Vault } from '@/types/multisig';
 import { getCurrentNetwork } from '@/lib/aptos';
-import { Copy, Users, Shield, Coins, ExternalLink } from 'lucide-react';
+import { Users, Shield, Coins, ExternalLink } from 'lucide-react';
 import { formatCompactBalance } from '@/lib/utils';
-import { useState } from 'react';
+import { AddressDisplay } from '@/components/ui/AddressDisplay';
 
 interface VaultDetailsProps {
   vault: Vault;
 }
 
 export function VaultDetails({ vault }: VaultDetailsProps) {
-  const [copied, setCopied] = useState(false);
-  const [copiedOwner, setCopiedOwner] = useState<number | null>(null);
-
-  const copyAddress = () => {
-    navigator.clipboard.writeText(vault.address);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const copyOwnerAddress = (owner: string, index: number) => {
-    navigator.clipboard.writeText(owner);
-    setCopiedOwner(index);
-    setTimeout(() => setCopiedOwner(null), 2000);
-  };
-
   return (
     <div className="bg-white rounded-xl shadow-card border border-neutral-200 p-6">
       <div className="flex items-start justify-between mb-6">
@@ -34,14 +19,7 @@ export function VaultDetails({ vault }: VaultDetailsProps) {
             {vault.name || 'Unnamed Vault'}
           </h1>
           <div className="flex items-center gap-2">
-            <code className="text-sm text-neutral-500 font-mono break-all">{vault.address}</code>
-            <button
-              onClick={copyAddress}
-              className="p-1 hover:bg-neutral-100 rounded transition-colors"
-              title="Copy full address"
-            >
-              <Copy className="w-4 h-4 text-neutral-400" />
-            </button>
+            <AddressDisplay address={vault.address} truncateLength={20} showCopyIcon className="text-sm text-neutral-500" />
             <a
               href={`https://explorer.movementnetwork.xyz/account/${vault.address}?network=${getCurrentNetwork().explorerNetwork}`}
               target="_blank"
@@ -51,9 +29,6 @@ export function VaultDetails({ vault }: VaultDetailsProps) {
             >
               <ExternalLink className="w-4 h-4 text-neutral-400" />
             </a>
-            {copied && (
-              <span className="text-xs text-emerald-600">Copied!</span>
-            )}
           </div>
         </div>
       </div>
@@ -95,20 +70,8 @@ export function VaultDetails({ vault }: VaultDetailsProps) {
           <h3 className="text-sm font-medium text-neutral-700 mb-2">Vault Owners</h3>
           <div className="space-y-2">
             {vault.owners.map((owner, index) => (
-              <div key={index} className="flex items-center justify-between p-2 bg-neutral-50 rounded-lg border border-neutral-100">
-                <code className="text-xs text-neutral-600 font-mono break-all">{owner}</code>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => copyOwnerAddress(owner, index)}
-                    className="p-1 hover:bg-neutral-200 rounded transition-colors"
-                    title="Copy full address"
-                  >
-                    <Copy className="w-3 h-3 text-neutral-400" />
-                  </button>
-                  {copiedOwner === index && (
-                    <span className="text-xs text-emerald-600">Copied!</span>
-                  )}
-                </div>
+              <div key={index} className="flex items-center p-2 bg-neutral-50 rounded-lg border border-neutral-100">
+                <AddressDisplay address={owner} truncateLength={20} showCopyIcon className="text-xs text-neutral-600" />
               </div>
             ))}
           </div>

@@ -8,6 +8,7 @@ import { formatMoveAmount } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/components/ui/toast';
 import { getCurrentNetwork } from '@/lib/aptos';
+import { AddressDisplay } from '@/components/ui/AddressDisplay';
 
 interface TransactionListProps {
   vaultAddress: string;
@@ -26,90 +27,97 @@ interface ParsedTransactionDetails {
   args?: any[];
 }
 
+// Check if a string contains only valid Move identifier characters (a-z, A-Z, 0-9, _)
+function isValidMoveIdentifier(s: string): boolean {
+  return s.length > 0 && s.length <= 128 && /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(s);
+}
+
+// Try to decode an EntryFunction starting at a given offset in the byte array
+function tryDecodeAtOffset(bytes: Uint8Array, startOffset: number): { moduleAddress: string, moduleName: string, functionName: string, typeArgsRaw: string[], args: Uint8Array[] } | null {
+  let offset = startOffset;
+
+  // Need at least 32 (address) + 1 (mod len) + 1 (mod char) + 1 (fn len) + 1 (fn char) bytes
+  if (bytes.length < offset + 36) return null;
+
+  // Read module address (32 bytes)
+  const addressBytes = bytes.slice(offset, offset + 32);
+  offset += 32;
+  const moduleAddress = '0x' + Array.from(addressBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+
+  // Read module name (ULEB128 length + string bytes)
+  const moduleNameLen = bytes[offset];
+  offset += 1;
+  if (moduleNameLen === 0 || moduleNameLen > 128 || offset + moduleNameLen > bytes.length) return null;
+  const moduleNameBytes = bytes.slice(offset, offset + moduleNameLen);
+  offset += moduleNameLen;
+  const moduleName = new TextDecoder().decode(moduleNameBytes);
+  if (!isValidMoveIdentifier(moduleName)) return null;
+
+  // Read function name (ULEB128 length + string bytes)
+  const functionNameLen = bytes[offset];
+  offset += 1;
+  if (functionNameLen === 0 || functionNameLen > 128 || offset + functionNameLen > bytes.length) return null;
+  const functionNameBytes = bytes.slice(offset, offset + functionNameLen);
+  offset += functionNameLen;
+  const functionName = new TextDecoder().decode(functionNameBytes);
+  if (!isValidMoveIdentifier(functionName)) return null;
+
+  // Read type args vector length
+  const typeArgsLen = bytes[offset];
+  offset += 1;
+
+  const typeArgsRaw: string[] = [];
+  for (let i = 0; i < typeArgsLen; i++) {
+    const tagType = bytes[offset];
+    offset += 1;
+
+    if (tagType === 7) { // Struct type
+      if (offset + 32 > bytes.length) return null;
+      const structAddrBytes = bytes.slice(offset, offset + 32);
+      const structAddr = '0x' + Array.from(structAddrBytes).map(b => b.toString(16).padStart(2, '0')).join('').replace(/^0+/, '').padStart(1, '0');
+      offset += 32;
+      const modLen = bytes[offset];
+      offset += 1;
+      if (offset + modLen > bytes.length) return null;
+      const modBytes = bytes.slice(offset, offset + modLen);
+      offset += modLen;
+      const modName = new TextDecoder().decode(modBytes);
+      const typeLen = bytes[offset];
+      offset += 1;
+      if (offset + typeLen > bytes.length) return null;
+      const typeBytes = bytes.slice(offset, offset + typeLen);
+      offset += typeLen;
+      const typeName = new TextDecoder().decode(typeBytes);
+      const genericCount = bytes[offset];
+      offset += 1;
+      typeArgsRaw.push(`${structAddr}::${modName}::${typeName}`);
+    }
+  }
+
+  // Read function args vector length
+  const argsLen = bytes[offset];
+  offset += 1;
+
+  const args: Uint8Array[] = [];
+  for (let i = 0; i < argsLen; i++) {
+    if (offset >= bytes.length) return null;
+    const argLen = bytes[offset];
+    offset += 1;
+    if (offset + argLen > bytes.length) return null;
+    const argBytes = bytes.slice(offset, offset + argLen);
+    offset += argLen;
+    args.push(argBytes);
+  }
+
+  return { moduleAddress, moduleName, functionName, typeArgsRaw, args };
+}
+
 // Manual BCS decoder for EntryFunction
-// Format: [Optional variant byte] + AccountAddress (32 bytes) + ModuleName (ULEB128 len + bytes) + FunctionName (ULEB128 len + bytes) + TypeArgs (vector) + Args (vector of bytes)
+// Tries both with and without a leading variant byte, validates which produces valid Move identifiers
 function manualDecodeEntryFunction(bytes: Uint8Array): { moduleAddress: string, moduleName: string, functionName: string, typeArgsRaw: string[], args: Uint8Array[] } | null {
   try {
-    let offset = 0;
-
-    // Check if there's a variant byte at the start (enum type indicator)
-    // If byte[32] is a valid module name length (3-20 chars like "coin", "aptos_account"),
-    // then there's no variant byte. If byte[32] < 3, it's too small for a module name,
-    // meaning there's a variant byte at the start that we need to skip.
-    if (bytes[32] < 3 || bytes[32] > 50) {
-      offset = 1;
-    }
-
-    // Read module address (32 bytes)
-    const addressBytes = bytes.slice(offset, offset + 32);
-    offset += 32;
-    const moduleAddress = '0x' + Array.from(addressBytes).map(b => b.toString(16).padStart(2, '0')).join('');
-
-    // Read module name (ULEB128 length + string bytes)
-    const moduleNameLen = bytes[offset];
-    offset += 1;
-    const moduleNameBytes = bytes.slice(offset, offset + moduleNameLen);
-    offset += moduleNameLen;
-    const moduleName = new TextDecoder().decode(moduleNameBytes);
-
-    // Read function name (ULEB128 length + string bytes)
-    const functionNameLen = bytes[offset];
-    offset += 1;
-    const functionNameBytes = bytes.slice(offset, offset + functionNameLen);
-    offset += functionNameLen;
-    const functionName = new TextDecoder().decode(functionNameBytes);
-
-    // Read type args vector length
-    const typeArgsLen = bytes[offset];
-    offset += 1;
-
-    const typeArgsRaw: string[] = [];
-    for (let i = 0; i < typeArgsLen; i++) {
-      // Type tags are complex - for now just skip and mark as present
-      // First byte is the tag type (7 = struct)
-      const tagType = bytes[offset];
-      offset += 1;
-
-      if (tagType === 7) { // Struct type
-        // Read struct address (32 bytes)
-        const structAddrBytes = bytes.slice(offset, offset + 32);
-        const structAddr = '0x' + Array.from(structAddrBytes).map(b => b.toString(16).padStart(2, '0')).join('').replace(/^0+/, '').padStart(1, '0');
-        offset += 32;
-        // Read module name
-        const modLen = bytes[offset];
-        offset += 1;
-        const modBytes = bytes.slice(offset, offset + modLen);
-        offset += modLen;
-        const modName = new TextDecoder().decode(modBytes);
-        // Read type name
-        const typeLen = bytes[offset];
-        offset += 1;
-        const typeBytes = bytes.slice(offset, offset + typeLen);
-        offset += typeLen;
-        const typeName = new TextDecoder().decode(typeBytes);
-        // Read generic type args count
-        const genericCount = bytes[offset];
-        offset += 1;
-        // Skip generics for now
-        typeArgsRaw.push(`${structAddr}::${modName}::${typeName}`);
-      }
-    }
-
-    // Read function args vector length
-    const argsLen = bytes[offset];
-    offset += 1;
-
-    const args: Uint8Array[] = [];
-    for (let i = 0; i < argsLen; i++) {
-      // Each arg is prefixed with its length (ULEB128)
-      const argLen = bytes[offset];
-      offset += 1;
-      const argBytes = bytes.slice(offset, offset + argLen);
-      offset += argLen;
-      args.push(argBytes);
-    }
-
-    return { moduleAddress, moduleName, functionName, typeArgsRaw, args };
+    // Try with variant byte first (offset 1), then without (offset 0)
+    return tryDecodeAtOffset(bytes, 1) || tryDecodeAtOffset(bytes, 0);
   } catch {
     return null;
   }
@@ -579,11 +587,7 @@ export function TransactionList({ vaultAddress, onCreateProposal }: TransactionL
                       <div className="flex items-center gap-2 text-sm text-movement-700">
                         <ArrowRight className="w-4 h-4" />
                         <span>To:</span>
-                        <code className="bg-movement-100 px-2 py-0.5 rounded font-mono text-xs">
-                          {details.recipient.length > 20
-                            ? `${details.recipient.slice(0, 10)}...${details.recipient.slice(-8)}`
-                            : details.recipient}
-                        </code>
+                        <AddressDisplay address={details.recipient} truncateLength={8} className="text-xs" />
                       </div>
                     )}
                   </div>
@@ -656,14 +660,13 @@ export function TransactionList({ vaultAddress, onCreateProposal }: TransactionL
                 {tx.approvers && tx.approvers.length > 0 && (
                   <div className="mt-2 flex flex-wrap items-center gap-1">
                     <span className="text-xs text-emerald-600 font-medium">Approved by:</span>
-                    {tx.approvers.map((approver, idx) => (
-                      <span
+                    {tx.approvers.map((approver) => (
+                      <AddressDisplay
                         key={approver}
-                        className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded font-mono"
-                        title={approver}
-                      >
-                        {approver.slice(0, 6)}...{approver.slice(-4)}
-                      </span>
+                        address={approver}
+                        truncateLength={4}
+                        className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded"
+                      />
                     ))}
                   </div>
                 )}
@@ -672,21 +675,20 @@ export function TransactionList({ vaultAddress, onCreateProposal }: TransactionL
                 {tx.rejectors && tx.rejectors.length > 0 && (
                   <div className="mt-1 flex flex-wrap items-center gap-1">
                     <span className="text-xs text-red-600 font-medium">Rejected by:</span>
-                    {tx.rejectors.map((rejector, idx) => (
-                      <span
+                    {tx.rejectors.map((rejector) => (
+                      <AddressDisplay
                         key={rejector}
-                        className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded font-mono"
-                        title={rejector}
-                      >
-                        {rejector.slice(0, 6)}...{rejector.slice(-4)}
-                      </span>
+                        address={rejector}
+                        truncateLength={4}
+                        className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded"
+                      />
                     ))}
                   </div>
                 )}
 
                 {tx.creator && (
                   <p className="text-xs text-neutral-400 mt-1">
-                    Created by: {tx.creator.slice(0, 8)}...
+                    Created by: <AddressDisplay address={tx.creator} truncateLength={6} className="text-xs text-neutral-400" />
                   </p>
                 )}
               </div>

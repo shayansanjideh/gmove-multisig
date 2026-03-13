@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useWallet } from '@aptos-labs/wallet-adapter-react';
 import { Wallet, CheckCircle, Copy, LogOut, ChevronDown, Check } from 'lucide-react';
 import { formatAddress } from '@/lib/aptos';
+import { AddressDisplay } from '@/components/ui/AddressDisplay';
 import { cn } from '@/lib/utils';
 
 export function WalletConnect() {
@@ -98,7 +99,7 @@ export function WalletConnect() {
         ) : connected && account ? (
           <>
             <CheckCircle className="w-4 h-4" />
-            <span>{formatAddress(getAccountAddress())}</span>
+            <AddressDisplay address={getAccountAddress()} truncateLength={6} copyOnClick={false} />
             <ChevronDown className={cn('w-4 h-4 transition-transform', showDropdown && 'rotate-180')} />
           </>
         ) : (
